@@ -1,0 +1,8 @@
+# Local LLM Start/Stop Scripts
+
+## Architecture note (initial migration)
+
+- Core orchestration remains in `Start AI.command` and `Stop AI.command`.
+- These `.command` files are the compatibility layer that preserves the known-good AppleScript + Terminal behavior.
+- Homebrew-installed commands are thin wrappers that call the `.command` scripts.
+- During the initial migration, orchestration logic in the `.command` scripts should not be rewritten unless a change is required strictly for packaging compatibility.
