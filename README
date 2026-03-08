@@ -22,3 +22,12 @@ Each wrapper:
 - forwards all arguments via `"$@"`
 - returns the underlying script exit code via `exec`
 - supports `--help`/`-h` at the wrapper level
+
+## State directory
+
+Runtime state (Terminal window IDs used by start/stop) is stored in:
+
+- `${LOCAL_LLM_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/local-llm}/terminal_window_ids.tmp`
+
+You can override the directory by setting `LOCAL_LLM_STATE_DIR` before invoking `local-llm-start` / `local-llm-stop`.
+
