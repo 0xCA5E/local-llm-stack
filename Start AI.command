@@ -9,11 +9,26 @@ set -euo pipefail
 WEBUI_NAME="open-webui"
 WEBUI_URL="http://localhost:3000"
 
-# State file stored next to this script
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-STATE_FILE="${SCRIPT_DIR}/.aistack_terminal_window_ids.tmp"
+# State file stored in user state directory (override with LOCAL_LLM_STATE_DIR)
+STATE_DIR="${LOCAL_LLM_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/local-llm}"
+STATE_FILE="${STATE_DIR}/terminal_window_ids.tmp"
 
 say_err() { printf '%s\n' "$*" >&2; }
+
+ensure_state_dir() {
+  if [[ -d "${STATE_DIR}" ]]; then
+    chmod 700 "${STATE_DIR}" 2>/dev/null || true
+    return
+  fi
+
+  if ! install -d -m 700 "${STATE_DIR}" 2>/dev/null; then
+    if ! mkdir -p "${STATE_DIR}" 2>/dev/null; then
+      say_err "Error: Cannot create state directory: ${STATE_DIR}"
+      exit 1
+    fi
+    chmod 700 "${STATE_DIR}" 2>/dev/null || true
+  fi
+}
 
 # Open a Terminal window running a command and return the window id
 open_terminal_window() {
@@ -40,6 +55,8 @@ APPLESCRIPT
 }
 
 echo "Starting AI stack..."
+
+ensure_state_dir
 
 # Create/reset state file
 : > "${STATE_FILE}" 2>/dev/null || {

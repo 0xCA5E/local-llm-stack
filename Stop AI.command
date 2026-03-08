@@ -3,15 +3,15 @@
 # Stops: Open WebUI container + Ollama server,
 # closes the exact Terminal windows created by Start (tracked by window IDs),
 # quits Docker Desktop completely,
-# deletes the temp state file (stored next to this script).
+# deletes the temp state file.
 
 set -euo pipefail
 
 WEBUI_NAME="open-webui"
 
-# State file stored next to this script
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-STATE_FILE="${SCRIPT_DIR}/.aistack_terminal_window_ids.tmp"
+# State file stored in user state directory (override with LOCAL_LLM_STATE_DIR)
+STATE_DIR="${LOCAL_LLM_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/local-llm}"
+STATE_FILE="${STATE_DIR}/terminal_window_ids.tmp"
 
 close_terminal_window_by_id() {
   local win_id="$1"
@@ -62,10 +62,20 @@ fi
 pkill -f "[o]llama serve" >/dev/null 2>&1 || true
 
 # Close Terminal windows created by Start script
-if [[ -f "${STATE_FILE}" && -s "${STATE_FILE}" ]]; then
+if [[ ! -e "${STATE_FILE}" ]]; then
+  echo "No saved Terminal window state found at ${STATE_FILE}."
+elif [[ ! -f "${STATE_FILE}" ]]; then
+  echo "Warning: State path is not a regular file: ${STATE_FILE}"
+elif [[ ! -s "${STATE_FILE}" ]]; then
+  echo "State file exists but is empty: ${STATE_FILE}"
+else
   while IFS= read -r WIN_ID; do
     [[ -z "${WIN_ID}" ]] && continue
-    close_terminal_window_by_id "${WIN_ID}" || true
+    if [[ "${WIN_ID}" =~ ^[0-9]+$ ]]; then
+      close_terminal_window_by_id "${WIN_ID}" || true
+    else
+      echo "Warning: Ignoring corrupt window id in state file: ${WIN_ID}"
+    fi
   done < "${STATE_FILE}"
 fi
 
