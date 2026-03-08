@@ -1,27 +1,44 @@
 # Local LLM Start/Stop Scripts
 
-## Architecture note (initial migration)
+## Primary onboarding (Homebrew)
 
-- Core orchestration remains in `Start AI.command` and `Stop AI.command`.
-- These `.command` files are the compatibility layer that preserves the known-good AppleScript + Terminal behavior.
-- Homebrew-installed commands are thin wrappers that call the `.command` scripts.
-- During the initial migration, orchestration logic in the `.command` scripts should not be rewritten unless a change is required strictly for packaging compatibility.
+1. Install the formula (from your tap):
+   ```bash
+   brew install <tap>/local-llm-start-stop-scripts
+   ```
+2. Ensure Docker Desktop is installed:
+   ```bash
+   brew install --cask docker
+   open -a Docker
+   ```
+3. Run environment diagnostics:
+   ```bash
+   local-llm-doctor
+   ```
+4. Start the stack:
+   ```bash
+   local-llm-start
+   ```
 
-## CLI wrappers
+If `local-llm-doctor` reports issues, follow the exact `fix:` lines it prints and rerun `local-llm-doctor`.
 
-Executable wrapper scripts are available in `bin/`:
+## Commands
 
-- `bin/local-llm-start` → runs `Start AI.command`
-- `bin/local-llm-stop` → runs `Stop AI.command`
-- `bin/local-llm-doctor` → runs dependency checks
+- `local-llm-start` → runs `Start AI.command`
+- `local-llm-stop` → runs `Stop AI.command`
+- `local-llm-doctor` → checks prerequisites + runtime readiness:
+  - `docker` CLI present
+  - Docker Desktop app detected (macOS)
+  - Docker daemon reachable
+  - `ollama` binary present and service responding
+  - Open WebUI container running with port mapping
+  - WebUI reachable at `http://localhost:3000`
 
-Each wrapper:
+## Legacy/manual installer
 
-- invokes the underlying script with `/bin/bash`
-- safely quotes paths (including filenames with spaces)
-- forwards all arguments via `"$@"`
-- returns the underlying script exit code via `exec`
-- supports `--help`/`-h` at the wrapper level
+`Install Dependencies.command` is kept as a legacy/manual path.
+
+Use it only if you are **not** relying on formula-managed onboarding. Homebrew users should prefer `brew install ...` + `local-llm-doctor`.
 
 ## State directory
 
@@ -30,4 +47,3 @@ Runtime state (Terminal window IDs used by start/stop) is stored in:
 - `${LOCAL_LLM_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/local-llm}/terminal_window_ids.tmp`
 
 You can override the directory by setting `LOCAL_LLM_STATE_DIR` before invoking `local-llm-start` / `local-llm-stop`.
-
