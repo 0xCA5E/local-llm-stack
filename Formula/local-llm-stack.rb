@@ -1,7 +1,7 @@
 class LocalLlmStack < Formula
   desc "Local scripts to start/stop a macOS Docker + Ollama + Open WebUI stack"
-  homepage "https://github.com/example/local-llm-start-stop-scripts"
-  head "https://github.com/example/local-llm-start-stop-scripts.git", branch: "main"
+  homepage "https://github.com/0xCA5E/local-llm-start-stop-scripts"
+  head "https://github.com/0xCA5E/local-llm-start-stop-scripts.git", branch: "main"
 
   depends_on :macos
 
