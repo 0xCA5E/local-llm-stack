@@ -9,11 +9,68 @@ set -euo pipefail
 WEBUI_NAME="open-webui"
 WEBUI_URL="http://localhost:3000"
 
-# State file stored next to this script
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-STATE_FILE="${SCRIPT_DIR}/.aistack_terminal_window_ids.tmp"
+# State file stored in user state directory (override with LOCAL_LLM_STATE_DIR)
+STATE_DIR="${LOCAL_LLM_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/local-llm}"
+STATE_FILE="${STATE_DIR}/terminal_window_ids.tmp"
+LEGACY_STATE_FILES=(
+  "/tmp/local_llm_terminal_window_ids.tmp"
+  "/tmp/terminal_window_ids.tmp"
+)
 
 say_err() { printf '%s\n' "$*" >&2; }
+
+require_macos() {
+  if [[ "$(uname -s)" != "Darwin" ]]; then
+    say_err "Error: Start AI.command only supports macOS (Terminal + AppleScript required)."
+    exit 1
+  fi
+}
+
+require_command() {
+  local cmd="$1"
+  local install_hint="${2-}"
+
+  if command -v "${cmd}" >/dev/null 2>&1; then
+    return
+  fi
+
+  say_err "Error: ${cmd} is required but was not found in PATH."
+  if [[ -n "${install_hint}" ]]; then
+    say_err "Hint: ${install_hint}"
+  fi
+  exit 1
+}
+
+ensure_state_dir() {
+  if [[ -d "${STATE_DIR}" ]]; then
+    chmod 700 "${STATE_DIR}" 2>/dev/null || true
+    return
+  fi
+
+  if ! install -d -m 700 "${STATE_DIR}" 2>/dev/null; then
+    if ! mkdir -p "${STATE_DIR}" 2>/dev/null; then
+      say_err "Error: Cannot create state directory: ${STATE_DIR}"
+      exit 1
+    fi
+    chmod 700 "${STATE_DIR}" 2>/dev/null || true
+  fi
+}
+
+relocate_legacy_state_file() {
+  local legacy_file
+
+  if [[ -f "${STATE_FILE}" && -s "${STATE_FILE}" ]]; then
+    return
+  fi
+
+  for legacy_file in "${LEGACY_STATE_FILES[@]}"; do
+    if [[ -f "${legacy_file}" && -s "${legacy_file}" ]]; then
+      cp "${legacy_file}" "${STATE_FILE}" 2>/dev/null || true
+      rm -f "${legacy_file}" 2>/dev/null || true
+      return
+    fi
+  done
+}
 
 # Open a Terminal window running a command and return the window id
 open_terminal_window() {
@@ -41,6 +98,14 @@ APPLESCRIPT
 
 echo "Starting AI stack..."
 
+require_macos
+require_command docker "Install Docker Desktop: brew install --cask docker"
+require_command ollama "Install Ollama: brew install ollama"
+require_command curl
+
+ensure_state_dir
+relocate_legacy_state_file
+
 # Create/reset state file
 : > "${STATE_FILE}" 2>/dev/null || {
   say_err "Error: Cannot write state file: ${STATE_FILE}"
@@ -66,12 +131,6 @@ fi
 if ! pgrep -x "Docker" >/dev/null 2>&1 && ! pgrep -x "Docker Desktop" >/dev/null 2>&1; then
   echo "Launching Docker Desktop..."
   open -a "Docker" 2>/dev/null || open -a "Docker Desktop" 2>/dev/null || true
-fi
-
-# Verify docker CLI exists
-if ! command -v docker >/dev/null 2>&1; then
-  say_err "Error: docker CLI not found in PATH."
-  exit 1
 fi
 
 echo "Waiting for Docker daemon..."

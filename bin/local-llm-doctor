@@ -1,0 +1,143 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+WEBUI_NAME="open-webui"
+WEBUI_URL="http://localhost:3000"
+
+if [[ "${1-}" == "--help" || "${1-}" == "-h" ]]; then
+  cat <<'USAGE'
+Usage: local-llm-doctor
+
+Checks local prerequisites and runtime readiness for the local AI stack:
+- docker CLI in PATH
+- Docker Desktop app detection on macOS
+- ollama binary availability
+- ollama server responsiveness
+- Open WebUI container + localhost:3000 readiness
+USAGE
+  exit 0
+fi
+
+status=0
+
+ok() { printf '[ok] %s\n' "$*"; }
+warn() { printf '[warn] %s\n' "$*"; }
+err() { printf '[missing] %s\n' "$*" >&2; status=1; }
+fix() { printf '       fix: %s\n' "$*" >&2; }
+
+has_docker_desktop_app() {
+  open -Ra "Docker" >/dev/null 2>&1 || open -Ra "Docker Desktop" >/dev/null 2>&1
+}
+
+check_docker_cli() {
+  if command -v docker >/dev/null 2>&1; then
+    ok "docker CLI found: $(command -v docker)"
+    return
+  fi
+
+  err "docker CLI not found in PATH"
+  fix "Install Docker Desktop, then restart your terminal: brew install --cask docker"
+}
+
+check_docker_desktop_app() {
+  if [[ "$(uname -s)" != "Darwin" ]]; then
+    warn "non-macOS environment detected; skipping Docker Desktop app check"
+    return
+  fi
+
+  if has_docker_desktop_app; then
+    ok "Docker Desktop app is installed"
+  else
+    err "Docker Desktop app is not installed"
+    fix "Install Docker Desktop: brew install --cask docker"
+    fix "Then open Docker once to complete first-run setup: open -a Docker"
+  fi
+}
+
+check_docker_daemon() {
+  if ! command -v docker >/dev/null 2>&1; then
+    return
+  fi
+
+  if docker info >/dev/null 2>&1; then
+    ok "Docker daemon is reachable"
+  else
+    err "Docker daemon is not reachable"
+    fix "Start Docker Desktop and wait until it reports \"Engine running\""
+    fix "You can launch it with: open -a Docker"
+  fi
+}
+
+check_ollama_binary() {
+  if command -v ollama >/dev/null 2>&1; then
+    ok "ollama found: $(command -v ollama)"
+  else
+    err "ollama not found in PATH"
+    fix "Install Ollama with Homebrew: brew install ollama"
+  fi
+}
+
+check_ollama_running() {
+  if ! command -v ollama >/dev/null 2>&1; then
+    return
+  fi
+
+  if ollama list >/dev/null 2>&1; then
+    ok "ollama service is responding"
+  else
+    err "ollama service is not responding"
+    fix "Start Ollama in a separate terminal: ollama serve"
+  fi
+}
+
+check_open_webui_container() {
+  if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
+    return
+  fi
+
+  if docker ps --format '{{.Names}}' | grep -qx "${WEBUI_NAME}"; then
+    ok "container '${WEBUI_NAME}' is running"
+  elif docker ps -a --format '{{.Names}}' | grep -qx "${WEBUI_NAME}"; then
+    err "container '${WEBUI_NAME}' exists but is not running"
+    fix "Start it with: docker start ${WEBUI_NAME}"
+    fix "Or run: local-llm-start"
+  else
+    err "container '${WEBUI_NAME}' is missing"
+    fix "Create/start it by running: local-llm-start"
+  fi
+
+  if docker ps --format '{{.Names}}' | grep -qx "${WEBUI_NAME}"; then
+    if docker port "${WEBUI_NAME}" 8080 2>/dev/null | grep -Eq '(:|\[)::?3000$|:3000$'; then
+      ok "container '${WEBUI_NAME}' exposes host port 3000"
+    else
+      err "container '${WEBUI_NAME}' is running but host port 3000 is not mapped"
+      fix "Recreate it with the expected mapping: docker rm -f ${WEBUI_NAME} && local-llm-start"
+    fi
+  fi
+}
+
+check_webui_http() {
+  if curl -fsS --max-time 2 "${WEBUI_URL}" >/dev/null 2>&1; then
+    ok "WebUI is reachable at ${WEBUI_URL}"
+  else
+    err "WebUI is not reachable at ${WEBUI_URL}"
+    fix "Start the stack with: local-llm-start"
+    fix "Then rerun this check: local-llm-doctor"
+  fi
+}
+
+check_docker_cli
+check_docker_desktop_app
+check_docker_daemon
+check_ollama_binary
+check_ollama_running
+check_open_webui_container
+check_webui_http
+
+if [[ "$status" -eq 0 ]]; then
+  echo 'Doctor checks passed.'
+else
+  echo 'Doctor checks found issues.' >&2
+fi
+
+exit "$status"
