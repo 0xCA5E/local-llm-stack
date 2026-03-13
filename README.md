@@ -60,9 +60,20 @@ After install:
 brew uninstall local-llm-stack
 ```
 
-Uninstalling the cask removes the packaged commands and prompts whether to remove Ollama models too.
+Uninstalling the cask removes the packaged commands and cleans up this project's own runtime artifacts.
 
-- `y`: full cleanup, including Ollama models.
-- `n` or Enter: remove everything except Ollama models.
+- Stops the managed `open-webui` container when possible.
+- Removes the managed `open-webui` container, volume, and image when Docker is reachable.
+- Removes local state files under `~/.local/state/local-llm` and temporary tracked Terminal window files.
 
-In all cases, uninstall removes the managed Open WebUI Docker image/container/volume, local state files, and Docker Desktop data. In non-interactive contexts, uninstall defaults to full cleanup.
+Uninstall does not remove shared dependencies or user data owned by other tools:
+
+- Docker Desktop remains installed.
+- Ollama remains installed.
+- Ollama models remain intact.
+
+For extra local cleanup, run:
+
+```bash
+brew uninstall --zap local-llm-stack
+```

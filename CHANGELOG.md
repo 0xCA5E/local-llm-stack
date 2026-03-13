@@ -7,7 +7,8 @@ All notable changes to this project are documented in this file.
 ### Changed
 - Replaced the Homebrew formula packaging flow with a cask-oriented install flow: `brew install --cask local-llm-stack`.
 - Removed the `local-llm-install-deps`, `local-llm-status`, and `local-llm-clean` commands from the supported CLI surface.
-- Added a package uninstall helper that removes Docker runtime artifacts automatically and prompts whether Ollama models should also be removed.
+- Updated cask uninstall behavior to be non-interactive and to remove only `local-llm-stack` runtime artifacts, leaving Docker Desktop, Ollama, and Ollama models installed.
+- Added a cask definition under `Casks/local-llm-stack.rb` with `zap` cleanup for local state files.
 
 ## [1.0.0] - 2026-03-08
 
